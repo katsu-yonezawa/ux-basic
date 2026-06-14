@@ -243,6 +243,54 @@
     ['memo', '直前暗記メモ', '🧠']
   ];
 
+  const CHAPTER_VISUALS = {
+    1: {
+      src: 'assets/read-visuals/ch01-ux-whole-experience.png',
+      alt: '利用前、利用中、利用後、継続利用までを示すUX全体像の図',
+      caption: 'UXは画面ではなく体験全体'
+    },
+    2: {
+      src: 'assets/read-visuals/ch02-hcd-iterative-process.png',
+      alt: '利用状況理解、要求整理、設計、評価、改善を循環させるHCDの図',
+      caption: 'HCDの反復プロセス'
+    },
+    3: {
+      src: 'assets/read-visuals/ch03-ux-project-planning-canvas.png',
+      alt: '目的、対象ユーザー、関係者、成果物、評価方法を整理する計画キャンバスの図',
+      caption: 'UXプロジェクト計画キャンバス'
+    },
+    4: {
+      src: 'assets/read-visuals/ch04-quantitative-qualitative-research.png',
+      alt: '定量調査と定性調査の使い分けを比較する図',
+      caption: '定量調査と定性調査の使い分け'
+    },
+    5: {
+      src: 'assets/read-visuals/ch05-user-requirement-system-requirement.png',
+      alt: '発話、ユーザー要求、システム要件の違いを三段階で示す図',
+      caption: 'ユーザー要求とシステム要件の違い'
+    },
+    6: {
+      src: 'assets/read-visuals/ch06-prototype-selection.png',
+      alt: '忠実度と範囲または深さからプロトタイプの種類を選ぶ図',
+      caption: 'プロトタイプの種類選択'
+    },
+    7: {
+      src: 'assets/read-visuals/ch07-user-test-expert-review.png',
+      alt: 'ユーザーテストとエキスパートレビューの違いと補完関係を示す図',
+      caption: 'ユーザーテストとエキスパートレビューの違い'
+    },
+    8: {
+      src: 'assets/read-visuals/ch08-devops-designops.png',
+      alt: 'DevOpsとDesignOpsが継続的な体験品質を支える関係を示す図',
+      caption: 'DevOpsとDesignOpsの役割比較'
+    },
+    9: {
+      src: 'assets/read-visuals/ch09-topdown-bottomup-loop.png',
+      alt: 'トップダウン型とボトムアップ型が相互循環するUXグロースの図',
+      caption: 'トップダウン型とボトムアップ型の相互循環'
+    }
+  };
+
   function chapterSubtitle(c) {
     const u = c.sections.understand || '';
     const first = u.split('\n').find(l => l.trim()) || '';
@@ -292,6 +340,12 @@
 
     const prev = DATA.chapters.find(x => x.num === num - 1);
     const next = DATA.chapters.find(x => x.num === num + 1);
+    const visual = CHAPTER_VISUALS[num];
+    const visualHtml = visual ? `
+          <figure class="chapter-visual card">
+            <img src="${visual.src}" alt="${esc(visual.alt)}" loading="lazy">
+            <figcaption>${esc(visual.caption)}</figcaption>
+          </figure>` : '';
 
     setView(`
       <div class="breadcrumbs"><a href="#/read">本編テキスト</a> › 第${num}章</div>
@@ -308,6 +362,7 @@
           </div>
         </aside>
         <div>
+          ${visualHtml}
           ${sections}
           <section class="doc-section" id="sec-quiz">
             <h2><span class="ico">❓</span>ミニ確認問題（${c.miniQuiz.length}問）</h2>

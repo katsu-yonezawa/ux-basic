@@ -268,6 +268,26 @@ main.container { padding-top: 28px; padding-bottom: 64px; min-height: 60vh; }
 .reader .toc a { display: block; padding: 5px 8px; border-radius: 7px; color: var(--text-soft); }
 .reader .toc a:hover { background: var(--bg-soft); text-decoration: none; }
 
+.chapter-visual {
+  margin: 0 0 26px;
+  overflow: hidden;
+  background: var(--bg-elev);
+}
+.chapter-visual img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1672 / 941;
+  object-fit: cover;
+}
+.chapter-visual figcaption {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .doc-section { margin-bottom: 26px; scroll-margin-top: 76px; }
 .doc-section > h2 {
   display: flex; align-items: center; gap: 10px;
