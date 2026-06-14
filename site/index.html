@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UX検定基礎 学習サイト</title>
+  <meta name="description" content="UX検定基礎（HCD検®認定）の学習サイト。本編テキスト9章、重要語句集、模擬問題100問を「読む・覚える・解く」で学習できます。" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+</head>
+<body>
+  <a class="skip-link" href="#main">本文へスキップ</a>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#/" aria-label="ホーム">
+        <span class="brand-mark">UX</span>
+        <span class="brand-text">検定基礎 学習サイト</span>
+      </a>
+      <nav class="topnav" id="topnav" aria-label="メインメニュー">
+        <a href="#/" data-nav="home">ホーム</a>
+        <a href="#/read" data-nav="read">読む</a>
+        <a href="#/cards" data-nav="cards">単語カード</a>
+        <a href="#/quiz" data-nav="quiz">問題演習</a>
+        <a href="#/search" data-nav="search">検索</a>
+        <a href="#/plan" data-nav="plan">計画・資料</a>
+      </nav>
+      <div class="topbar-tools">
+        <button id="themeToggle" class="icon-btn" title="表示テーマ切替" aria-label="表示テーマ切替">◐</button>
+        <button id="menuToggle" class="icon-btn menu-toggle" aria-label="メニュー" aria-expanded="false">☰</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="container" tabindex="-1"></main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>出典：UX検定基礎（HCD検®認定）試験対策教材（<code>docs/</code> 配下のオリジナル教材）。</p>
+      <p class="muted">本サイトの模擬問題はオリジナルであり、公式問題ではありません。合格基準・出題割合は公式に断定されていません。受験前に必ず公式サイトと最新シラバスを確認してください。</p>
+    </div>
+  </footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
