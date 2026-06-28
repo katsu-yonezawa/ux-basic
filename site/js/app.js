@@ -22,22 +22,48 @@
   const ALL_Q = [];
   function normQ(kind, q) {
     return { key: kind + ':' + q.id, kind, id: q.id, q: q.q, options: q.options,
-      answer: q.answer, explain: q.explain, wrong: q.wrong || {}, category: q.category };
+      answer: q.answer, explain: q.explain, wrong: q.wrong || {}, category: q.category,
+      chapterNum: q.chapterNum || null };
   }
   DATA.mockQuestions.forEach(q => ALL_Q.push(normQ('mock', q)));
   DATA.chapters.forEach(c => c.miniQuiz.forEach(q => ALL_Q.push(normQ('mini', q))));
 
   /* ---------- 試験メタ（docs/examOverview より） ---------- */
-  const EXAM_DATE = new Date('2026-07-11T13:00:00+09:00');
-  const EXAM_FACTS = [
-    ['試験日', '2026年7月11日(土) 13:00 一斉開始'],
-    ['出題形式', '知識問題（単一選択式）100問'],
-    ['試験時間', '100分'],
-    ['受験方式', 'オンライン（自宅受験）'],
-    ['申込期間', '2026年3月16日〜6月23日'],
-    ['受験料', '9,900円（税抜）/ 10,890円（税込）'],
-    ['合格基準', '公式に非公表（本サイトでは断定しません）']
-  ];
+  const EXAM_INFO = {
+    round: '第13回UX検定基礎',
+    sourceLabel: '第13回の公式案内に基づく情報',
+    checkedAt: DATA.meta.officialInfoCheckedAt || '2026-06-28',
+    applicationStart: new Date('2026-03-16T00:00:00+09:00'),
+    applicationDeadline: new Date('2026-06-23T23:59:59+09:00'),
+    examDate: new Date('2026-07-11T13:00:00+09:00'),
+    facts: [
+      ['出題形式', '知識問題（単一選択式）100問'],
+      ['試験時間', '100分'],
+      ['受験方式', 'オンライン（自宅受験）'],
+      ['受験料', '9,900円（税抜）/ 10,890円（税込）'],
+      ['合格基準', '公式に非公表（本サイトでは断定しません）']
+    ]
+  };
+  function getExamStatus(now) {
+    const t = now || new Date();
+    if (t > EXAM_INFO.examDate) {
+      return { phase: 'ended', label: 'この回の試験は終了しました', days: 0, applicationLabel: '申込期間終了' };
+    }
+    const days = Math.ceil((EXAM_INFO.examDate - t) / 86400000);
+    const appLabel = t > EXAM_INFO.applicationDeadline ? '申込期間終了'
+      : t >= EXAM_INFO.applicationStart ? '申込受付中' : '申込開始前';
+    return { phase: 'beforeExam', label: appLabel, days, applicationLabel: appLabel };
+  }
+  function examFacts(now) {
+    const st = getExamStatus(now);
+    return [
+      ['対象回', `${EXAM_INFO.round}（${EXAM_INFO.sourceLabel}）`],
+      ['確認日', EXAM_INFO.checkedAt],
+      ['試験日', '2026年7月11日(土) 13:00 一斉開始'],
+      ['申込期間', `2026年3月16日〜6月23日（${st.applicationLabel}）`],
+      ...EXAM_INFO.facts
+    ];
+  }
 
   /* ============================================================
      ユーティリティ
@@ -51,13 +77,44 @@
     for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
     return a;
   }
+  function prepareQuestionForSession(q) {
+    const originalKeys = ['A', 'B', 'C', 'D'].filter(k => q.options[k] != null);
+    const shuffledKeys = shuffle(originalKeys);
+    const displayOptions = shuffledKeys.map((originalKey, idx) => ({
+      displayLabel: ['A', 'B', 'C', 'D'][idx],
+      originalKey,
+      text: q.options[originalKey]
+    }));
+    const displayByOriginal = {};
+    displayOptions.forEach(o => { displayByOriginal[o.originalKey] = o.displayLabel; });
+    return Object.assign({}, q, { displayOptions, displayByOriginal });
+  }
+  function displayLabel(q, originalKey) {
+    return q && q.displayByOriginal ? q.displayByOriginal[originalKey] : originalKey;
+  }
+  function displayOptionText(q, originalKey) {
+    return q && q.options ? q.options[originalKey] : '';
+  }
+  function relatedChapterLink(q) {
+    if (!q || !q.chapterNum) return '';
+    const c = DATA.chapters.find(ch => ch.num === q.chapterNum);
+    if (!c) return '';
+    return `<a class="related-link" href="#/read/${q.chapterNum}">関連章を読む：第${q.chapterNum}章 ${esc(c.title.replace(/^第\\d+章\\s*/, ''))}</a>`;
+  }
   function navigate(hash) { if (location.hash === hash) render(); else location.hash = hash; }
   function pct(n, d) { return d ? Math.round((n / d) * 100) : 0; }
 
   let toastTimer = null;
   function toast(msg) {
     let t = document.querySelector('.toast');
-    if (!t) { t = document.createElement('div'); t.className = 'toast'; document.body.appendChild(t); }
+    if (!t) {
+      t = document.createElement('div');
+      t.className = 'toast';
+      t.setAttribute('role', 'status');
+      t.setAttribute('aria-live', 'polite');
+      t.setAttribute('aria-atomic', 'true');
+      document.body.appendChild(t);
+    }
     t.textContent = msg; requestAnimationFrame(() => t.classList.add('show'));
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1700);
   }
@@ -119,6 +176,7 @@
     main.innerHTML = html;
     updateNav();
     if (!(opts && opts.keepScroll)) window.scrollTo(0, 0);
+    if (!(opts && opts.skipFocus) && main.focus) main.focus({ preventScroll: true });
     if (onMount) onMount();
     closeMenu();
   }
@@ -126,7 +184,12 @@
     const seg = (location.hash.split('/')[1] || '').split('?')[0];
     const map = { '': 'home', read: 'read', cards: 'cards', glossary: 'cards', quiz: 'quiz', search: 'search', plan: 'plan' };
     const active = map[seg] || 'home';
-    document.querySelectorAll('.topnav a').forEach(a => a.classList.toggle('active', a.dataset.nav === active));
+    document.querySelectorAll('.topnav a').forEach(a => {
+      const isActive = a.dataset.nav === active;
+      a.classList.toggle('active', isActive);
+      if (isActive) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
   }
 
   function render() {
@@ -161,11 +224,33 @@
     return { readCount, cardsKnown, bestMock, acc, answered: Object.keys(STORE.quiz.stats).length };
   }
 
+  function homeRecommendation() {
+    const unread = DATA.chapters.find(c => !STORE.read[c.num]);
+    const wrong = ALL_Q.filter(q => { const s = STORE.quiz.stats[q.key]; return s && s.lastCorrect === false; }).length;
+    const reviewCards = Object.values(STORE.cards).filter(v => v === 'review').length;
+    const mockHist = STORE.quiz.history.filter(h => h.isMock);
+    const actions = [];
+    if (unread) actions.push(`<a class="btn sm primary" href="#/read/${unread.num}">第${unread.num}章を読む</a>`);
+    if (wrong) actions.push(`<a class="btn sm teal" href="#/quiz">間違い復習を始める</a>`);
+    else if (!mockHist.length) actions.push(`<a class="btn sm" href="#/quiz">10問クイック演習</a>`);
+    if (reviewCards) actions.push(`<a class="btn sm ghost" href="#/cards">要復習カードを見る</a>`);
+    return `
+      <div class="card next-card">
+        <h3>今日のおすすめ</h3>
+        <ul>
+          <li><span>未読の章</span><strong>${unread ? `第${unread.num}章 ${esc(unread.title)}` : '全章読了済み'}</strong></li>
+          <li><span>復習対象</span><strong>${wrong ? `間違えた問題 ${wrong}問` : '直近の誤答はありません'}</strong></li>
+          <li><span>要復習カード</span><strong>${reviewCards}語</strong></li>
+        </ul>
+        <div class="btn-row">${actions.join('')}</div>
+      </div>`;
+  }
+
   function viewHome() {
     const s = progressSummary();
-    const days = Math.ceil((EXAM_DATE - new Date()) / 86400000);
-    const countdown = days > 0
-      ? `<div class="countdown"><div class="num">${days}</div><div class="lbl">DAYS TO EXAM</div></div>` : '';
+    const examStatus = getExamStatus();
+    const countdown = examStatus.phase !== 'ended' && examStatus.days > 0
+      ? `<div class="countdown"><div class="num">${examStatus.days}</div><div class="lbl">DAYS TO EXAM</div></div>` : '';
 
     const stat = (label, value, sub, p) => `
       <div class="stat card">
@@ -185,13 +270,14 @@
         <span class="q-body"><h3>${t}</h3><p>${d}</p></span>
       </a>`).join('');
 
-    const facts = EXAM_FACTS.map(([k, v]) => `<li><span class="k">${k}</span><span class="v">${esc(v)}</span></li>`).join('');
+    const facts = examFacts().map(([k, v]) => `<li><span class="k">${k}</span><span class="v">${esc(v)}</span></li>`).join('');
 
     setView(`
       <section class="hero">
         ${countdown}
         <h1>UX検定基礎 学習サイト</h1>
         <p>UXを「画面の見た目」ではなく、ユーザー理解 → 価値仮説 → 要求定義 → 具現化 → 評価 → 運用・組織化までの一連の活動として学びます。「読む・覚える・解く」を行き来して、用語の使い分けを身につけましょう。</p>
+        <p class="hero-note">${esc(EXAM_INFO.round)}: ${esc(examStatus.label)}。本サイトは非公式教材で、模擬問題は公式問題ではありません。</p>
         <div class="hero-actions">
           <a class="btn primary" href="#/read">学習をはじめる</a>
           <a class="btn ghost" href="#/quiz">模擬試験に挑戦</a>
@@ -206,6 +292,8 @@
         ${stat('演習正答率', s.acc == null ? '—' : s.acc + '%', s.acc == null ? '未演習' : `${s.answered}問演習`, s.acc)}
       </div>
 
+      ${homeRecommendation()}
+
       <div class="section-title"><span class="dot"></span>今日のはじめかた</div>
       <div class="grid cols-2 quick-grid">${quick}</div>
 
@@ -214,7 +302,7 @@
         <div class="card" style="padding:18px 20px"><ul class="fact-list">${facts}</ul></div>
         <div class="card" style="padding:20px">
           <h3 style="margin:0 0 8px;font-size:16px">学習の進め方（おすすめ）</h3>
-          <p class="text-soft" style="font-size:14px;margin:0 0 12px">用語を単体で覚えるのではなく、似た概念の違いを説明できる状態を目指します。</p>
+          <p class="text-soft" style="font-size:14px;margin:0 0 12px">用語を単体で覚えるのではなく、似た概念の違いを説明できる状態を目指します。公式シラバスは更新される可能性があるため、受験直前に公式サイトと最新シラバスを確認してください。</p>
           <ol style="margin:0;padding-left:1.2em;font-size:14px;line-height:1.9">
             <li>各章を読む（要点・関連語の違い・実務例）</li>
             <li>章末のミニ問題で使い分けを確認</li>
@@ -247,47 +335,65 @@
     1: {
       src: 'assets/read-visuals/ch01-ux-whole-experience.png',
       alt: '利用前、利用中、利用後、継続利用までを示すUX全体像の図',
-      caption: 'UXは画面ではなく体験全体'
+      caption: 'UXは画面ではなく体験全体',
+      reading: 'UXは利用前、利用中、利用後、継続利用まで含む体験全体として読みます。',
+      examTip: 'UIや画面美化だけに限定する選択肢に注意します。'
     },
     2: {
       src: 'assets/read-visuals/ch02-hcd-iterative-process.png',
-      alt: '利用状況理解、要求整理、設計、評価、改善を循環させるHCDの図',
-      caption: 'HCDの反復プロセス'
+      alt: '利用状況理解、ユーザー要求事項、設計解、評価を反復するHCDプロセスの図',
+      caption: 'HCDの反復プロセス',
+      reading: 'HCDは予備活動と、利用状況の理解、ユーザー要求事項の明示、設計解の作成、評価という4つの主要活動を反復します。',
+      examTip: 'ユーザーに聞くだけ、最初に仕様を固定する、評価を最後だけ行う、という説明は不適切です。'
     },
     3: {
       src: 'assets/read-visuals/ch03-ux-project-planning-canvas.png',
       alt: '目的、対象ユーザー、関係者、成果物、評価方法を整理する計画キャンバスの図',
-      caption: 'UXプロジェクト計画キャンバス'
+      caption: 'UXプロジェクト計画キャンバス',
+      reading: 'UXプロジェクトでは目的、対象ユーザー、関係者、成果物、評価方法を早めに揃えます。',
+      examTip: '計画はスケジュール表だけではありません。'
     },
     4: {
       src: 'assets/read-visuals/ch04-quantitative-qualitative-research.png',
       alt: '定量調査と定性調査の使い分けを比較する図',
-      caption: '定量調査と定性調査の使い分け'
+      caption: '定量調査と定性調査の使い分け',
+      reading: '定量は「どのくらい」、定性は「なぜ」を見る調査として読みます。',
+      examTip: '数が多いほど常に正しい、定性は主観的で使えない、という説明に注意します。'
     },
     5: {
       src: 'assets/read-visuals/ch05-user-requirement-system-requirement.png',
       alt: '発話、ユーザー要求、システム要件の違いを三段階で示す図',
-      caption: 'ユーザー要求とシステム要件の違い'
+      caption: 'ユーザー要求とシステム要件の違い',
+      reading: 'ユーザー発話、ユーザー要求、システム要件は粒度が違います。',
+      examTip: '「検索機能がほしい」をそのまま要求としないことが大切です。'
     },
     6: {
       src: 'assets/read-visuals/ch06-prototype-selection.png',
       alt: '忠実度と範囲または深さからプロトタイプの種類を選ぶ図',
-      caption: 'プロトタイプの種類選択'
+      caption: 'プロトタイプの種類選択',
+      reading: '検証したい仮説に応じてプロトタイプの忠実度や範囲を選びます。',
+      examTip: 'ハイファイが常に最適ではありません。'
     },
     7: {
       src: 'assets/read-visuals/ch07-user-test-expert-review.png',
       alt: 'ユーザーテストとエキスパートレビューの違いと補完関係を示す図',
-      caption: 'ユーザーテストとエキスパートレビューの違い'
+      caption: 'ユーザーテストとエキスパートレビューの違い',
+      reading: 'ユーザーテストとエキスパートレビューは補完関係です。',
+      examTip: '実ユーザーの行動を見る評価と、専門家が原則で見る評価を混同しないようにします。'
     },
     8: {
       src: 'assets/read-visuals/ch08-devops-designops.png',
       alt: 'DevOpsとDesignOpsが継続的な体験品質を支える関係を示す図',
-      caption: 'DevOpsとDesignOpsの役割比較'
+      caption: 'DevOpsとDesignOpsの役割比較',
+      reading: 'DevOpsは開発・運用の継続改善、DesignOpsはデザイン活動の継続改善を支えます。',
+      examTip: 'DesignOpsを単なるデザイナー管理と捉えないようにします。'
     },
     9: {
       src: 'assets/read-visuals/ch09-topdown-bottomup-loop.png',
       alt: 'トップダウン型とボトムアップ型が相互循環するUXグロースの図',
-      caption: 'トップダウン型とボトムアップ型の相互循環'
+      caption: 'トップダウン型とボトムアップ型の相互循環',
+      reading: 'トップダウンとボトムアップを循環させ、組織としてUXを育てます。',
+      examTip: '経営主導か現場主導かの一方だけで完結しません。'
     }
   };
 
@@ -345,6 +451,10 @@
           <figure class="chapter-visual card">
             <img src="${visual.src}" alt="${esc(visual.alt)}" loading="lazy">
             <figcaption>${esc(visual.caption)}</figcaption>
+            <div class="visual-note">
+              <p><strong>この図の読み方</strong>${esc(visual.reading)}</p>
+              <p><strong>試験で問われやすい誤解</strong>${esc(visual.examTip)}</p>
+            </div>
           </figure>` : '';
 
     setView(`
@@ -397,12 +507,19 @@
     if (filter === 'new') list = list.filter(g => cardState(g.term) !== 'known');
     else if (filter === 'review') list = list.filter(g => cardState(g.term) === 'review');
     else if (filter === 'known') list = list.filter(g => cardState(g.term) === 'known');
+    else if (filter === 'priorityA') list = list.filter(g => g.priority === 'A');
+    else if (filter === 'priorityB') list = list.filter(g => g.priority === 'B');
+    else if (filter && filter.startsWith('category:')) {
+      const cat = filter.slice('category:'.length);
+      list = list.filter(g => (g.category || '') === cat);
+    }
     return list;
   }
 
   function viewCards() {
     if (!CARDS) CARDS = { filter: 'all', idx: 0, flipped: false, list: buildCardList('all') };
     const knownCount = Object.values(STORE.cards).filter(v => v === 'known').length;
+    const categories = Array.from(new Set(DATA.glossary.map(g => g.category).filter(Boolean))).sort();
     setView(`
       <div class="page-head">
         <span class="eyebrow">重要語句集</span>
@@ -415,7 +532,15 @@
           <button data-f="new">未学習</button>
           <button data-f="review">要復習</button>
           <button data-f="known">覚えた</button>
+          <button data-f="priorityA">重要度A</button>
+          <button data-f="priorityB">重要度B</button>
         </div>
+        <label class="select-filter">カテゴリ
+          <select id="cardCategory">
+            <option value="">すべて</option>
+            ${categories.map(cat => `<option value="${esc(cat)}">${esc(cat)}</option>`).join('')}
+          </select>
+        </label>
         <div style="flex:1"></div>
         <button class="btn sm ghost" id="shuffleBtn">🔀 シャッフル</button>
         <a class="btn sm ghost" href="#/glossary">一覧で見る</a>
@@ -429,6 +554,15 @@
           viewCards();
         });
       });
+      const categorySelect = document.getElementById('cardCategory');
+      if (categorySelect) {
+        categorySelect.value = CARDS.filter.startsWith('category:') ? CARDS.filter.slice('category:'.length) : '';
+        categorySelect.addEventListener('change', () => {
+          CARDS.filter = categorySelect.value ? 'category:' + categorySelect.value : 'all';
+          CARDS.list = buildCardList(CARDS.filter); CARDS.idx = 0; CARDS.flipped = false;
+          viewCards();
+        });
+      }
       document.getElementById('shuffleBtn').addEventListener('click', () => {
         CARDS.list = shuffle(CARDS.list); CARDS.idx = 0; CARDS.flipped = false; drawCard();
       });
@@ -449,18 +583,22 @@
     const st = cardState(g.term);
     const stBadge = st === 'known' ? '<span class="chip green">覚えた</span>'
       : st === 'review' ? '<span class="chip amber">要復習</span>' : '';
+    const meta = [g.priority ? `重要度${g.priority}` : '', g.category || ''].filter(Boolean)
+      .map(v => `<span class="chip accent">${esc(v)}</span>`).join('');
     const row = (lbl, val) => val ? `<dt>${lbl}</dt><dd>${esc(val)}</dd>` : '';
     stage.innerHTML = `
       <div class="flashcard-stage">
-        <div class="flashcard ${CARDS.flipped ? 'flipped' : ''}" id="flash">
+        <div class="flashcard ${CARDS.flipped ? 'flipped' : ''}" id="flash" role="button" tabindex="0" aria-expanded="${CARDS.flipped ? 'true' : 'false'}" aria-label="${esc(g.term)}の意味を表示">
           <div class="inner">
             <div class="face front">
               <span class="badge-state">${stBadge}</span>
+              <div class="card-meta">${meta}</div>
               <div class="term">${esc(g.term)}</div>
               <div class="hint">タップで意味を表示</div>
             </div>
             <div class="face back">
               <span class="badge-state">${stBadge}</span>
+              <div class="card-meta">${meta}</div>
               <div class="term">${esc(g.term)}</div>
               <dl>
                 ${row('一言定義', g.def)}
@@ -482,8 +620,16 @@
           <button class="btn ghost" id="nextCard">次へ ›</button>
         </div>
       </div>`;
-    const flip = () => { CARDS.flipped = !CARDS.flipped; document.getElementById('flash').classList.toggle('flipped', CARDS.flipped); };
+    const flip = () => {
+      CARDS.flipped = !CARDS.flipped;
+      const flash = document.getElementById('flash');
+      flash.classList.toggle('flipped', CARDS.flipped);
+      flash.setAttribute('aria-expanded', CARDS.flipped ? 'true' : 'false');
+    };
     document.getElementById('flash').addEventListener('click', flip);
+    document.getElementById('flash').addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.code === 'Space') { e.preventDefault(); e.stopPropagation(); flip(); }
+    });
     document.getElementById('flipBtn').addEventListener('click', e => { e.stopPropagation(); flip(); });
     document.getElementById('prevCard').addEventListener('click', () => move(-1));
     document.getElementById('nextCard').addEventListener('click', () => move(1));
@@ -507,6 +653,8 @@
     const rows = DATA.glossary.map(g => `
       <tr>
         <td class="term-cell">${esc(g.term)}</td>
+        <td>${g.priority ? `<span class="chip accent">重要度${esc(g.priority)}</span>` : '—'}</td>
+        <td>${esc(g.category || '—')}</td>
         <td>${esc(g.def)}</td>
         <td class="muted">${esc(g.confusing || '—')}</td>
       </tr>`).join('');
@@ -516,7 +664,7 @@
         <p>一言定義と「混同しやすい語」を一覧で確認できます。詳しい説明や実務例は<a href="#/cards">単語カード</a>で。</p></div>
       <div class="card" style="padding:4px 8px;overflow-x:auto">
         <table class="glossary-table">
-          <thead><tr><th>用語</th><th>一言定義</th><th>混同しやすい語</th></tr></thead>
+          <thead><tr><th>用語</th><th>重要度</th><th>カテゴリ</th><th>一言定義</th><th>混同しやすい語</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
@@ -609,7 +757,7 @@
     if (!opts.questions || !opts.questions.length) { toast('対象の問題がありません'); return; }
     SESSION = {
       mode: opts.mode, instant: !!opts.instant, isMock: !!opts.isMock, title: opts.title,
-      questions: opts.questions, idx: 0, answers: {},
+      questions: opts.questions.map(prepareQuestionForSession), idx: 0, answers: {},
       timerSec: opts.timerSec || 0, remain: opts.timerSec || 0, result: null
     };
     navigate('#/quiz/run');
@@ -666,25 +814,29 @@
     const counter = document.getElementById('counter');
     if (counter) counter.textContent = `${SESSION.idx + 1} / ${total}`;
 
-    const opts = ['A', 'B', 'C', 'D'].filter(k => q.options[k] != null).map(k => {
+    const opts = q.displayOptions.map(o => {
+      const k = o.originalKey;
       let cls = 'opt';
       if (reveal) {
         if (k === q.answer) cls += ' correct';
         else if (k === chosen) cls += ' wrong';
       } else if (k === chosen) cls += ' selected';
-      return `<button class="${cls}" data-opt="${k}" ${reveal ? 'disabled' : ''}>
-          <span class="key">${k}</span><span>${esc(q.options[k])}</span></button>`;
+      const status = reveal && k === q.answer ? '<span class="opt-status">正解</span>'
+        : reveal && k === chosen ? '<span class="opt-status">選択</span>' : '';
+      return `<button class="${cls}" data-opt="${k}" aria-pressed="${k === chosen ? 'true' : 'false'}" ${reveal ? 'disabled' : ''}>
+          <span class="key">${o.displayLabel}</span><span>${esc(o.text)}</span>${status}</button>`;
     }).join('');
 
     let feedback = '';
     if (reveal) {
       const ok = chosen === q.answer;
-      const why = Object.keys(q.wrong).map(k => `<li><strong>${k}</strong>：${esc(q.wrong[k])}</li>`).join('');
+      const why = Object.keys(q.wrong).map(k => `<li><strong>${displayLabel(q, k)}</strong>：${esc(q.wrong[k])}</li>`).join('');
       feedback = `
-        <div class="feedback show ${ok ? 'ok' : 'ng'}">
-          <div class="verdict">${ok ? '◯ 正解' : '✕ 不正解'}<span class="muted" style="font-weight:600">　正解は ${q.answer}</span></div>
+        <div class="feedback show ${ok ? 'ok' : 'ng'}" aria-live="polite">
+          <div class="verdict">${ok ? '◯ 正解' : '✕ 不正解'}<span class="muted" style="font-weight:600">　正解は ${displayLabel(q, q.answer)}</span></div>
           <p class="explain">${esc(q.explain)}</p>
           ${why ? `<ul class="why">${why}</ul>` : ''}
+          ${relatedChapterLink(q)}
         </div>`;
     }
 
@@ -782,14 +934,14 @@
     const wrong = SESSION.questions.filter(q => SESSION.answers[q.key] !== q.answer);
     const reviewHtml = wrong.map(q => {
       const a = SESSION.answers[q.key];
-      const why = Object.keys(q.wrong).map(k => `<li><strong>${k}</strong>：${esc(q.wrong[k])}</li>`).join('');
+      const why = Object.keys(q.wrong).map(k => `<li><strong>${displayLabel(q, k)}</strong>：${esc(q.wrong[k])}</li>`).join('');
       return `
         <div class="card review-item">
           <div class="q-cat">${esc(q.category)}${q.kind === 'mock' ? '　/　問' + q.id : ''}</div>
           <p class="q-text">${esc(q.q)}</p>
-          <p class="ans-line your"><span class="tag">あなたの解答：</span>${a ? `${a}. ${esc(q.options[a])}` : '未回答'}</p>
-          <p class="ans-line right"><span class="tag">正解：</span>${q.answer}. ${esc(q.options[q.answer])}</p>
-          <div class="feedback show" style="margin-top:10px"><p class="explain">${esc(q.explain)}</p>${why ? `<ul class="why">${why}</ul>` : ''}</div>
+          <p class="ans-line your"><span class="tag">あなたの解答：</span>${a ? `${displayLabel(q, a)}. ${esc(displayOptionText(q, a))}` : '未回答'}</p>
+          <p class="ans-line right"><span class="tag">正解：</span>${displayLabel(q, q.answer)}. ${esc(displayOptionText(q, q.answer))}</p>
+          <div class="feedback show" style="margin-top:10px"><p class="explain">${esc(q.explain)}</p>${why ? `<ul class="why">${why}</ul>` : ''}${relatedChapterLink(q)}</div>
         </div>`;
     }).join('');
 
@@ -898,7 +1050,7 @@
     }[active];
     setView(`
       <div class="page-head"><span class="eyebrow">計画・資料</span><h1>学習計画と公式資料</h1>
-        <p>試験概要・シラバス網羅表・直前メモ・学習計画をまとめています。</p></div>
+        <p>試験概要・シラバス網羅表・直前メモ・学習計画をまとめています。本サイトは非公式教材であり、模擬問題は公式問題ではありません。受験直前に公式サイトと最新シラバスを確認してください。</p></div>
       <div class="tabs">${tabs.map(t => `<button data-tab="${t[0]}" class="${t[0] === active ? 'active' : ''}">${t[1]}</button>`).join('')}</div>
       <div class="card" style="padding:8px 22px"><div class="doc-render">${content}</div></div>
     `, () => {
@@ -934,8 +1086,12 @@
   // キーボード操作（単語カード）
   document.addEventListener('keydown', e => {
     if (!location.hash.startsWith('#/cards') || !CARDS) return;
-    if (e.target.tagName === 'INPUT') return;
-    if (e.code === 'Space') { e.preventDefault(); CARDS.flipped = !CARDS.flipped; const f = document.getElementById('flash'); if (f) f.classList.toggle('flipped', CARDS.flipped); }
+    if (e.target.closest('input, button, a, textarea, select, [contenteditable], .flashcard')) return;
+    if (e.code === 'Space') {
+      e.preventDefault(); CARDS.flipped = !CARDS.flipped;
+      const f = document.getElementById('flash');
+      if (f) { f.classList.toggle('flipped', CARDS.flipped); f.setAttribute('aria-expanded', CARDS.flipped ? 'true' : 'false'); }
+    }
     else if (e.key === 'ArrowRight') move(1);
     else if (e.key === 'ArrowLeft') move(-1);
     else if (e.key === '1') mark('review');
