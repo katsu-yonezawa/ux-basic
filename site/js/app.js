@@ -274,14 +274,16 @@
 
     setView(`
       <section class="hero">
-        ${countdown}
-        <h1>UX検定基礎 学習サイト</h1>
-        <p>UXを「画面の見た目」ではなく、ユーザー理解 → 価値仮説 → 要求定義 → 具現化 → 評価 → 運用・組織化までの一連の活動として学びます。「読む・覚える・解く」を行き来して、用語の使い分けを身につけましょう。</p>
-        <p class="hero-note">${esc(EXAM_INFO.round)}: ${esc(examStatus.label)}。本サイトは非公式教材で、模擬問題は公式問題ではありません。</p>
-        <div class="hero-actions">
-          <a class="btn primary" href="#/read">学習をはじめる</a>
-          <a class="btn ghost" href="#/quiz">模擬試験に挑戦</a>
+        <div class="hero-body">
+          <h1>UX検定基礎 学習サイト</h1>
+          <p>UXを「画面の見た目」ではなく、ユーザー理解 → 価値仮説 → 要求定義 → 具現化 → 評価 → 運用・組織化までの一連の活動として学びます。「読む・覚える・解く」を行き来して、用語の使い分けを身につけましょう。</p>
+          <p class="hero-note">${esc(EXAM_INFO.round)}: ${esc(examStatus.label)}。本サイトは非公式教材で、模擬問題は公式問題ではありません。</p>
+          <div class="hero-actions">
+            <a class="btn primary" href="#/read">学習をはじめる</a>
+            <a class="btn ghost" href="#/quiz">模擬試験に挑戦</a>
+          </div>
         </div>
+        ${countdown}
       </section>
 
       <div class="section-title"><span class="dot"></span>あなたの学習状況</div>
@@ -299,18 +301,18 @@
 
       <div class="section-title"><span class="dot"></span>試験概要</div>
       <div class="grid cols-2">
-        <div class="card" style="padding:18px 20px"><ul class="fact-list">${facts}</ul></div>
-        <div class="card" style="padding:20px">
-          <h3 style="margin:0 0 8px;font-size:16px">学習の進め方（おすすめ）</h3>
-          <p class="text-soft" style="font-size:14px;margin:0 0 12px">用語を単体で覚えるのではなく、似た概念の違いを説明できる状態を目指します。公式シラバスは更新される可能性があるため、受験直前に公式サイトと最新シラバスを確認してください。</p>
-          <ol style="margin:0;padding-left:1.2em;font-size:14px;line-height:1.9">
+        <div class="card"><ul class="fact-list">${facts}</ul></div>
+        <div class="card howto-card">
+          <h3>学習の進め方（おすすめ）</h3>
+          <p class="text-soft">用語を単体で覚えるのではなく、似た概念の違いを説明できる状態を目指します。公式シラバスは更新される可能性があるため、受験直前に公式サイトと最新シラバスを確認してください。</p>
+          <ol>
             <li>各章を読む（要点・関連語の違い・実務例）</li>
             <li>章末のミニ問題で使い分けを確認</li>
             <li>単語カードで重要語句を反復</li>
             <li>模擬問題100問を時間を計って演習</li>
             <li>間違いを章へ戻って復習</li>
           </ol>
-          <div class="btn-row" style="margin-top:14px">
+          <div class="btn-row">
             <a class="btn sm" href="#/plan">学習計画を見る</a>
             <a class="btn sm ghost" href="#/plan/syllabus">シラバス網羅表</a>
           </div>
@@ -467,7 +469,7 @@
         <aside class="toc card">
           <h4>このページの目次</h4>
           ${toc}
-          <div style="margin-top:12px">
+          <div class="mt-3">
             <button class="btn sm ${done ? 'teal' : 'primary'} block" id="readBtn">${done ? '✓ 読了済み' : '読了にする'}</button>
           </div>
         </aside>
@@ -541,7 +543,7 @@
             ${categories.map(cat => `<option value="${esc(cat)}">${esc(cat)}</option>`).join('')}
           </select>
         </label>
-        <div style="flex:1"></div>
+        <div class="spacer"></div>
         <button class="btn sm ghost" id="shuffleBtn">🔀 シャッフル</button>
         <a class="btn sm ghost" href="#/glossary">一覧で見る</a>
       </div>
@@ -585,41 +587,54 @@
       : st === 'review' ? '<span class="chip amber">要復習</span>' : '';
     const meta = [g.priority ? `重要度${g.priority}` : '', g.category || ''].filter(Boolean)
       .map(v => `<span class="chip accent">${esc(v)}</span>`).join('');
-    const row = (lbl, val) => val ? `<dt>${lbl}</dt><dd>${esc(val)}</dd>` : '';
+    const row = (lbl, val, cls) => val ? `<dt${cls ? ` class="${cls}"` : ''}>${lbl}</dt><dd>${esc(val)}</dd>` : '';
+    const group = (label, cls, inner) => inner
+      ? `<div class="back-group${cls ? ' ' + cls : ''}"><span class="group-label">${label}</span><dl>${inner}</dl></div>` : '';
+    // ヘッダー行は通常フロー（絶対配置しない）: チップが折り返しても本文が押し下がるだけで重ならない
+    const head = `<div class="face-head"><div class="card-meta">${meta}</div><span class="badge-state">${stBadge}</span></div>`;
     stage.innerHTML = `
       <div class="flashcard-stage">
         <div class="flashcard ${CARDS.flipped ? 'flipped' : ''}" id="flash" role="button" tabindex="0" aria-expanded="${CARDS.flipped ? 'true' : 'false'}" aria-label="${esc(g.term)}の意味を表示">
           <div class="inner">
             <div class="face front">
-              <span class="badge-state">${stBadge}</span>
-              <div class="card-meta">${meta}</div>
-              <div class="term">${esc(g.term)}</div>
-              <div class="hint">タップで意味を表示</div>
+              ${head}
+              <div class="face-body">
+                <div class="term">${esc(g.term)}</div>
+                <div class="hint">タップで意味を表示</div>
+              </div>
             </div>
             <div class="face back">
-              <span class="badge-state">${stBadge}</span>
-              <div class="card-meta">${meta}</div>
-              <div class="term">${esc(g.term)}</div>
-              <dl>
-                ${row('一言定義', g.def)}
-                ${row('詳しい説明', g.desc)}
-                ${row('関連語', g.related)}
-                ${row('混同しやすい語', g.confusing)}
-                ${row('実務例', g.practice)}
-                ${row('試験での注意点', g.note)}
-              </dl>
+              ${head}
+              <div class="face-body" id="backBody">
+                <div class="term">${esc(g.term)}</div>
+                ${group('定義・説明', '', row('一言定義', g.def) + row('詳しい説明', g.desc))}
+                ${group('関連語・混同しやすい語', 'warn', row('関連語', g.related) + row('混同しやすい語', g.confusing, 'warn'))}
+                ${group('実務・試験対策', '', row('実務例', g.practice) + row('試験での注意点', g.note))}
+              </div>
             </div>
           </div>
         </div>
-        <div class="card-progress">${CARDS.idx + 1} / ${list.length}</div>
+        <div class="card-progress">
+          <span>${CARDS.idx + 1} / ${list.length}</span>
+          <span class="deck-bar"><span style="width:${pct(CARDS.idx + 1, list.length)}%"></span></span>
+        </div>
         <div class="flashcard-controls">
           <button class="btn ghost" id="prevCard">‹ 前へ</button>
           <button class="btn ghost" id="flipBtn">めくる</button>
-          <button class="btn" style="border-color:var(--amber);color:var(--amber)" id="reviewBtn">もう一度</button>
+          <button class="btn warn" id="reviewBtn">もう一度</button>
           <button class="btn teal" id="knownBtn">覚えた ✓</button>
           <button class="btn ghost" id="nextCard">次へ ›</button>
         </div>
       </div>`;
+    // 裏面のスクロール続きフェード（末尾まで読んだら消す）
+    const backFace = stage.querySelector('.face.back');
+    const backBody = document.getElementById('backBody');
+    const updateFade = () => {
+      const rest = backBody.scrollHeight - backBody.clientHeight - backBody.scrollTop;
+      backFace.classList.toggle('can-scroll', rest > 4);
+    };
+    backBody.addEventListener('scroll', updateFade, { passive: true });
+    updateFade();
     const flip = () => {
       CARDS.flipped = !CARDS.flipped;
       const flash = document.getElementById('flash');
@@ -662,7 +677,7 @@
       <div class="breadcrumbs"><a href="#/cards">単語カード</a> › 一覧</div>
       <div class="page-head"><span class="eyebrow">重要語句集</span><h1>用語一覧（${DATA.glossary.length}語）</h1>
         <p>一言定義と「混同しやすい語」を一覧で確認できます。詳しい説明や実務例は<a href="#/cards">単語カード</a>で。</p></div>
-      <div class="card" style="padding:4px 8px;overflow-x:auto">
+      <div class="card table-card">
         <table class="glossary-table">
           <thead><tr><th>用語</th><th>重要度</th><th>カテゴリ</th><th>一言定義</th><th>混同しやすい語</th></tr></thead>
           <tbody>${rows}</tbody>
@@ -768,12 +783,14 @@
     const exam = SESSION.mode === 'exam';
     setView(`
       <div class="quiz-run">
-        <div class="quiz-top">
-          <button class="btn sm ghost" id="quitBtn">‹ 中断</button>
-          <strong style="font-size:14px">${esc(SESSION.title)}</strong>
-          ${exam ? '<span class="quiz-timer" id="timer">--:--</span>' : '<span class="muted" id="counter"></span>'}
+        <div class="quiz-sticky">
+          <div class="quiz-top">
+            <button class="btn sm ghost" id="quitBtn">‹ 中断</button>
+            <strong class="quiz-title">${esc(SESSION.title)}</strong>
+            ${exam ? '<span class="quiz-timer" id="timer">--:--</span>' : '<span class="muted" id="counter"></span>'}
+          </div>
+          <div class="quiz-progressbar"><span id="pbar"></span></div>
         </div>
-        <div class="quiz-progressbar"><span id="pbar"></span></div>
         <div id="qregion"></div>
       </div>
     `, () => {
@@ -833,7 +850,7 @@
       const why = Object.keys(q.wrong).map(k => `<li><strong>${displayLabel(q, k)}</strong>：${esc(q.wrong[k])}</li>`).join('');
       feedback = `
         <div class="feedback show ${ok ? 'ok' : 'ng'}" aria-live="polite">
-          <div class="verdict">${ok ? '◯ 正解' : '✕ 不正解'}<span class="muted" style="font-weight:600">　正解は ${displayLabel(q, q.answer)}</span></div>
+          <div class="verdict">${ok ? '◯ 正解' : '✕ 不正解'}<span class="muted verdict-sub">　正解は ${displayLabel(q, q.answer)}</span></div>
           <p class="explain">${esc(q.explain)}</p>
           ${why ? `<ul class="why">${why}</ul>` : ''}
           ${relatedChapterLink(q)}
@@ -853,7 +870,7 @@
         <button class="btn ghost" data-act="prev" ${SESSION.idx === 0 ? 'disabled' : ''}>‹ 前へ</button>
         ${answered ? (last ? '<button class="btn primary" data-act="finish">結果を見る</button>'
                             : '<button class="btn primary" data-act="next">次へ ›</button>')
-                   : '<span class="muted" style="align-self:center;font-size:13px">選択肢を選んでください</span>'}`;
+                   : '<span class="muted quiz-hint">選択肢を選んでください</span>'}`;
     }
 
     region.innerHTML = `
@@ -926,8 +943,9 @@
     const catRows = Object.keys(byCat).sort((a, b) => (byCat[a].c / byCat[a].t) - (byCat[b].c / byCat[b].t))
       .map(cat => {
         const o = byCat[cat], pp = pct(o.c, o.t);
+        const lv = pp >= 70 ? 'lv-good' : pp >= 40 ? 'lv-mid' : 'lv-low';
         return `<div class="row"><span class="label">${esc(cat)}</span>
-          <span><span class="mini-bar"><span style="width:${pp}%;background:${pp >= 70 ? 'var(--green)' : pp >= 40 ? 'var(--amber)' : 'var(--red)'}"></span></span>${o.c}/${o.t}</span></div>`;
+          <span><span class="mini-bar"><span class="${lv}" style="width:${pp}%"></span></span>${o.c}/${o.t}</span></div>`;
       }).join('');
 
     // 間違いレビュー
@@ -941,7 +959,7 @@
           <p class="q-text">${esc(q.q)}</p>
           <p class="ans-line your"><span class="tag">あなたの解答：</span>${a ? `${displayLabel(q, a)}. ${esc(displayOptionText(q, a))}` : '未回答'}</p>
           <p class="ans-line right"><span class="tag">正解：</span>${displayLabel(q, q.answer)}. ${esc(displayOptionText(q, q.answer))}</p>
-          <div class="feedback show" style="margin-top:10px"><p class="explain">${esc(q.explain)}</p>${why ? `<ul class="why">${why}</ul>` : ''}${relatedChapterLink(q)}</div>
+          <div class="feedback show"><p class="explain">${esc(q.explain)}</p>${why ? `<ul class="why">${why}</ul>` : ''}${relatedChapterLink(q)}</div>
         </div>`;
     }).join('');
 
@@ -950,7 +968,7 @@
         <div class="score-ring" style="--p:${p}"><div class="inner"><div class="pct">${p}%</div><div class="frac">${correct} / ${total} 問正解</div></div></div>
         <div class="result-msg">${msg}</div>
         <p class="muted">${esc(SESSION.title)}${SESSION.isMock ? '（本番形式）' : ''}</p>
-        <div class="btn-row" style="justify-content:center;margin-top:14px">
+        <div class="btn-row center mt-4">
           ${wrong.length ? '<button class="btn teal" id="reviewWrongBtn">間違い ' + wrong.length + '問だけ復習</button>' : ''}
           <button class="btn primary" id="retryBtn">もう一度</button>
           <a class="btn ghost" href="#/quiz">メニューへ</a>
@@ -958,7 +976,7 @@
       </div>
 
       <div class="section-title"><span class="dot"></span>カテゴリ別の正答</div>
-      <div class="card" style="padding:8px 18px"><div class="cat-breakdown">${catRows}</div></div>
+      <div class="card breakdown-card"><div class="cat-breakdown">${catRows}</div></div>
 
       ${wrong.length ? `<div class="section-title"><span class="dot"></span>復習：間違えた問題（${wrong.length}問）</div>${reviewHtml}`
         : '<div class="section-title"><span class="dot"></span>全問正解！</div><div class="empty-state"><div class="big">🏆</div><p>このセットは全問正解です。お見事！</p></div>'}
@@ -1005,7 +1023,7 @@
 
   function doSearch(q) {
     const box = document.getElementById('searchResults');
-    if (!q) { box.innerHTML = '<p class="muted" style="text-align:center;padding:30px">キーワードを入力してください。</p>'; return; }
+    if (!q) { box.innerHTML = '<p class="muted search-empty">キーワードを入力してください。</p>'; return; }
     const lq = q.toLowerCase();
     const inc = s => (s || '').toLowerCase().indexOf(lq) >= 0;
 
@@ -1052,7 +1070,7 @@
       <div class="page-head"><span class="eyebrow">計画・資料</span><h1>学習計画と公式資料</h1>
         <p>試験概要・シラバス網羅表・直前メモ・学習計画をまとめています。本サイトは非公式教材であり、模擬問題は公式問題ではありません。受験直前に公式サイトと最新シラバスを確認してください。</p></div>
       <div class="tabs">${tabs.map(t => `<button data-tab="${t[0]}" class="${t[0] === active ? 'active' : ''}">${t[1]}</button>`).join('')}</div>
-      <div class="card" style="padding:8px 22px"><div class="doc-render">${content}</div></div>
+      <div class="card doc-card"><div class="doc-render">${content}</div></div>
     `, () => {
       document.querySelectorAll('.tabs button').forEach(b =>
         b.addEventListener('click', () => navigate('#/plan/' + b.dataset.tab)));
