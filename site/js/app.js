@@ -174,6 +174,10 @@
   function setView(html, onMount, opts) {
     if (TIMER) { clearInterval(TIMER); TIMER = null; }
     main.innerHTML = html;
+    // 画面切替のフェードイン（prefers-reduced-motion 時は CSS 側で無効化される）
+    main.classList.remove('view-enter');
+    void main.offsetWidth;
+    main.classList.add('view-enter');
     updateNav();
     if (!(opts && opts.keepScroll)) window.scrollTo(0, 0);
     if (!(opts && opts.skipFocus) && main.focus) main.focus({ preventScroll: true });
@@ -253,7 +257,7 @@
       ? `<div class="countdown"><div class="num">${examStatus.days}</div><div class="lbl">DAYS TO EXAM</div></div>` : '';
 
     const stat = (label, value, sub, p) => `
-      <div class="stat card">
+      <div class="stat card${p >= 100 ? ' complete' : ''}">
         <span class="stat-label">${label}</span>
         <span class="stat-value">${value}${sub ? ` <small>${sub}</small>` : ''}</span>
         ${p != null ? `<div class="bar"><span style="width:${p}%"></span></div>` : ''}
@@ -409,9 +413,16 @@
     const readCount = DATA.chapters.filter(c => STORE.read[c.num]).length;
     const items = DATA.chapters.map(c => {
       const done = !!STORE.read[c.num];
+      const v = CHAPTER_VISUALS[c.num];
+      const thumb = v ? `
+          <span class="ch-thumb">
+            <img src="${v.src}" alt="" loading="lazy">
+            ${done ? '<span class="ch-check" aria-hidden="true">✓</span>' : ''}
+          </span>` : '';
       return `
         <a class="card ch-item ${done ? 'done' : ''}" href="#/read/${c.num}">
           <span class="ch-num">${done ? '✓' : c.num}</span>
+          ${thumb}
           <span class="ch-meta"><h3>${esc(c.title)}</h3><p>${esc(chapterSubtitle(c))}</p></span>
           <span class="ch-status">${done ? '<span class="done-tag">読了</span>' : 'ミニ問題 ' + c.miniQuiz.length + '問'}</span>
         </a>`;
@@ -454,8 +465,8 @@
             <img src="${visual.src}" alt="${esc(visual.alt)}" loading="lazy">
             <figcaption>${esc(visual.caption)}</figcaption>
             <div class="visual-note">
-              <p><strong>この図の読み方</strong>${esc(visual.reading)}</p>
-              <p><strong>試験で問われやすい誤解</strong>${esc(visual.examTip)}</p>
+              <p><strong>👀 この図の読み方</strong>${esc(visual.reading)}</p>
+              <p><strong>⚠️ 試験で問われやすい誤解</strong>${esc(visual.examTip)}</p>
             </div>
           </figure>` : '';
 
@@ -945,7 +956,8 @@
         const o = byCat[cat], pp = pct(o.c, o.t);
         const lv = pp >= 70 ? 'lv-good' : pp >= 40 ? 'lv-mid' : 'lv-low';
         return `<div class="row"><span class="label">${esc(cat)}</span>
-          <span><span class="mini-bar"><span class="${lv}" style="width:${pp}%"></span></span>${o.c}/${o.t}</span></div>`;
+          <span class="mini-bar"><span class="${lv}" style="width:${pp}%"></span></span>
+          <span class="frac">${o.c}/${o.t}</span></div>`;
       }).join('');
 
     // 間違いレビュー
@@ -965,7 +977,7 @@
 
     setView(`
       <div class="result-hero card">
-        <div class="score-ring" style="--p:${p}"><div class="inner"><div class="pct">${p}%</div><div class="frac">${correct} / ${total} 問正解</div></div></div>
+        <div class="score-ring" style="--p:${p};--ring:${p >= 90 ? 'var(--green)' : p >= 75 ? 'var(--teal)' : p >= 60 ? 'var(--amber)' : 'var(--red)'}"><div class="inner"><div class="pct">${p}%</div><div class="frac">${correct} / ${total} 問正解</div></div></div>
         <div class="result-msg">${msg}</div>
         <p class="muted">${esc(SESSION.title)}${SESSION.isMock ? '（本番形式）' : ''}</p>
         <div class="btn-row center mt-4">
@@ -1048,11 +1060,11 @@
 
     let html = '';
     if (gloss.length) html += `<div class="search-group"><h3>重要語句（${gloss.length}）</h3>` +
-      gloss.map(g => `<a class="card search-hit" href="#/cards" data-term="${esc(g.term)}"><h4><span class="chip accent">語句</span>${hl(g.term, q)}</h4><p>${hl(g.def, q)}</p></a>`).join('') + '</div>';
+      gloss.map(g => `<a class="card search-hit" href="#/cards" data-term="${esc(g.term)}"><h4><span class="chip accent">語句</span><span class="hit-title">${hl(g.term, q)}</span></h4><p>${hl(g.def, q)}</p></a>`).join('') + '</div>';
     if (chaps.length) html += `<div class="search-group"><h3>本編テキスト（${chaps.length}）</h3>` +
-      chaps.map(o => `<a class="card search-hit" href="#/read/${o.c.num}"><h4><span class="chip teal">本編</span>${esc(o.c.title)}</h4><p>${hl(o.text.replace(/\n+/g, ' '), q)}</p></a>`).join('') + '</div>';
+      chaps.map(o => `<a class="card search-hit" href="#/read/${o.c.num}"><h4><span class="chip teal">本編</span><span class="hit-title">${esc(o.c.title)}</span></h4><p>${hl(o.text.replace(/\n+/g, ' '), q)}</p></a>`).join('') + '</div>';
     if (ques.length) html += `<div class="search-group"><h3>問題（${ques.length}）</h3>` +
-      ques.map(x => `<div class="card search-hit"><h4><span class="chip amber">問題</span>${esc(x.category)}${x.kind === 'mock' ? '・問' + x.id : ''}</h4><p>${hl(x.q, q)}</p></div>`).join('') + '</div>';
+      ques.map(x => `<div class="card search-hit"><h4><span class="chip amber">問題</span><span class="hit-title">${esc(x.category)}${x.kind === 'mock' ? '・問' + x.id : ''}</span></h4><p>${hl(x.q, q)}</p></div>`).join('') + '</div>';
     if (!html) html = `<div class="empty-state"><div class="big">🔍</div><p>「${esc(q)}」に一致する内容は見つかりませんでした。</p></div>`;
     box.innerHTML = html;
   }
@@ -1099,6 +1111,12 @@
     const open = nav.classList.toggle('open');
     document.getElementById('menuToggle').setAttribute('aria-expanded', String(open));
   });
+
+  // スクロール時のみ topbar の境界を強調
+  const topbarEl = document.querySelector('.topbar');
+  window.addEventListener('scroll', () => {
+    topbarEl.classList.toggle('scrolled', window.scrollY > 4);
+  }, { passive: true });
 
   // テーマ
   const savedTheme = localStorage.getItem('uxtheme');
