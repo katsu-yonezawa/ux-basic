@@ -667,11 +667,11 @@
   function viewGlossaryTable() {
     const rows = DATA.glossary.map(g => `
       <tr>
-        <td class="term-cell">${esc(g.term)}</td>
-        <td>${g.priority ? `<span class="chip accent">重要度${esc(g.priority)}</span>` : '—'}</td>
-        <td>${esc(g.category || '—')}</td>
-        <td>${esc(g.def)}</td>
-        <td class="muted">${esc(g.confusing || '—')}</td>
+        <td class="term-cell" data-label="用語">${esc(g.term)}</td>
+        <td data-label="重要度">${g.priority ? `<span class="chip accent">重要度${esc(g.priority)}</span>` : '—'}</td>
+        <td data-label="カテゴリ">${esc(g.category || '—')}</td>
+        <td data-label="一言定義">${esc(g.def)}</td>
+        <td class="muted" data-label="混同しやすい語">${esc(g.confusing || '—')}</td>
       </tr>`).join('');
     setView(`
       <div class="breadcrumbs"><a href="#/cards">単語カード</a> › 一覧</div>
@@ -1009,6 +1009,16 @@
       const input = document.getElementById('searchInput');
       input.focus();
       input.addEventListener('input', () => doSearch(input.value.trim()));
+      // 用語ヒットは該当カードを直接開く（先頭カード固定への遷移を解消）
+      document.getElementById('searchResults').addEventListener('click', e => {
+        const a = e.target.closest('a[data-term]');
+        if (!a) return;
+        e.preventDefault();
+        const list = buildCardList('all');
+        const idx = list.findIndex(g => g.term === a.dataset.term);
+        CARDS = { filter: 'all', idx: Math.max(0, idx), flipped: false, list };
+        navigate('#/cards');
+      });
     });
   }
 
@@ -1038,11 +1048,11 @@
 
     let html = '';
     if (gloss.length) html += `<div class="search-group"><h3>重要語句（${gloss.length}）</h3>` +
-      gloss.map(g => `<a class="card search-hit" href="#/cards"><h4>${hl(g.term, q)}</h4><p>${hl(g.def, q)}</p></a>`).join('') + '</div>';
+      gloss.map(g => `<a class="card search-hit" href="#/cards" data-term="${esc(g.term)}"><h4><span class="chip accent">語句</span>${hl(g.term, q)}</h4><p>${hl(g.def, q)}</p></a>`).join('') + '</div>';
     if (chaps.length) html += `<div class="search-group"><h3>本編テキスト（${chaps.length}）</h3>` +
-      chaps.map(o => `<a class="card search-hit" href="#/read/${o.c.num}"><h4>${esc(o.c.title)}</h4><p>${hl(o.text.replace(/\n+/g, ' '), q)}</p></a>`).join('') + '</div>';
+      chaps.map(o => `<a class="card search-hit" href="#/read/${o.c.num}"><h4><span class="chip teal">本編</span>${esc(o.c.title)}</h4><p>${hl(o.text.replace(/\n+/g, ' '), q)}</p></a>`).join('') + '</div>';
     if (ques.length) html += `<div class="search-group"><h3>問題（${ques.length}）</h3>` +
-      ques.map(x => `<div class="card search-hit"><h4>${esc(x.category)}${x.kind === 'mock' ? '・問' + x.id : ''}</h4><p>${hl(x.q, q)}</p></div>`).join('') + '</div>';
+      ques.map(x => `<div class="card search-hit"><h4><span class="chip amber">問題</span>${esc(x.category)}${x.kind === 'mock' ? '・問' + x.id : ''}</h4><p>${hl(x.q, q)}</p></div>`).join('') + '</div>';
     if (!html) html = `<div class="empty-state"><div class="big">🔍</div><p>「${esc(q)}」に一致する内容は見つかりませんでした。</p></div>`;
     box.innerHTML = html;
   }
